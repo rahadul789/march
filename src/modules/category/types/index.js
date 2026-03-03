@@ -1,3 +1,5 @@
-﻿'use strict';
+﻿const { CATEGORY_DEFAULTS } = require('./constants');
 
-module.exports = {};
+module.exports = {
+  CATEGORY_DEFAULTS
+};

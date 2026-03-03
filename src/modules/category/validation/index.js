@@ -1,3 +1,3 @@
-﻿'use strict';
+﻿const categoryValidation = require('./category.validation');
 
-module.exports = {};
+module.exports = categoryValidation;

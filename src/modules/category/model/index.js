@@ -1,3 +1,5 @@
-﻿'use strict';
+﻿const Category = require('./category.model');
 
-module.exports = {};
+module.exports = {
+  Category
+};

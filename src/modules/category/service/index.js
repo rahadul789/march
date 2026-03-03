@@ -1,3 +1,3 @@
-﻿'use strict';
+﻿const categoryService = require('./category.service');
 
-module.exports = {};
+module.exports = categoryService;

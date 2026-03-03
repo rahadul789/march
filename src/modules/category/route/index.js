@@ -1,3 +1,3 @@
-﻿'use strict';
+﻿const categoryRoute = require('./category.route');
 
-module.exports = {};
+module.exports = categoryRoute;
