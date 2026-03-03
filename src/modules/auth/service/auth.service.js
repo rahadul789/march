@@ -3,6 +3,7 @@ const AppError = require('../../../core/errors/AppError');
 const logger = require('../../../core/logger/logger');
 const { User, RefreshSession } = require('../model');
 const { ACCOUNT_STATUSES, SESSION_STATUSES } = require('../types');
+const deviceService = require('../../device/service');
 const { hashPassword, verifyPassword } = require('./password.service');
 const {
   hashTokenId,
@@ -43,7 +44,7 @@ function buildAuthQueryFromIdentifier(identifier) {
 function buildDeviceInfo(context = {}) {
   return {
     deviceId: context.deviceId || null,
-    platform: context.platform || null,
+    platform: context.platform || context.deviceType || null,
     userAgent: context.userAgent || null,
     ipAddress: context.ipAddress || null,
     pushToken: context.pushToken || null
@@ -94,6 +95,16 @@ async function createSessionAndTokens(user, context = {}) {
     role: user.role,
     status: user.status,
     sessionId
+  });
+
+  await deviceService.upsertDeviceForSession({
+    userId: user._id,
+    sessionId,
+    deviceId: context.deviceId || null,
+    pushToken: context.pushToken || null,
+    deviceType: context.deviceType || context.platform || null,
+    userAgent: context.userAgent || null,
+    ipAddress: context.ipAddress || null
   });
 
   return {
@@ -231,6 +242,16 @@ async function refreshTokens(refreshToken, context = {}) {
     sessionId: payload.sid
   });
 
+  await deviceService.upsertDeviceForSession({
+    userId: user._id,
+    sessionId: payload.sid,
+    deviceId: context.deviceId || null,
+    pushToken: context.pushToken || null,
+    deviceType: context.deviceType || context.platform || null,
+    userAgent: context.userAgent || null,
+    ipAddress: context.ipAddress || null
+  });
+
   return {
     user: sanitizeUser(user),
     tokens: {
@@ -271,6 +292,13 @@ async function logout(refreshToken) {
       }
     }
   );
+
+  if (result.modifiedCount > 0) {
+    await deviceService.removeDeviceBySession({
+      userId: payload.sub,
+      sessionId: payload.sid
+    });
+  }
 
   return {
     invalidated: result.modifiedCount > 0

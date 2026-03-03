@@ -1,3 +1,3 @@
-﻿'use strict';
+﻿const deviceController = require('./device.controller');
 
-module.exports = {};
+module.exports = deviceController;
