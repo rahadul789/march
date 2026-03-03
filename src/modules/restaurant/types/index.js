@@ -1,3 +1,5 @@
-﻿'use strict';
+﻿const { RESTAURANT_APPROVAL_STATUSES } = require('./constants');
 
-module.exports = {};
+module.exports = {
+  RESTAURANT_APPROVAL_STATUSES
+};
