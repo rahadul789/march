@@ -1,3 +1,3 @@
-﻿'use strict';
+﻿const menuValidation = require('./menu.validation');
 
-module.exports = {};
+module.exports = menuValidation;

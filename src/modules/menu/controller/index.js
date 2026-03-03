@@ -1,3 +1,3 @@
-﻿'use strict';
+﻿const menuController = require('./menu.controller');
 
-module.exports = {};
+module.exports = menuController;
