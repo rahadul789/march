@@ -1,3 +1,3 @@
-﻿'use strict';
+﻿const deviceService = require('./device.service');
 
-module.exports = {};
+module.exports = deviceService;

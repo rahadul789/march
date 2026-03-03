@@ -1,3 +1,3 @@
-﻿'use strict';
+﻿const deviceRoute = require('./device.route');
 
-module.exports = {};
+module.exports = deviceRoute;

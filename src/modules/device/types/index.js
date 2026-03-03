@@ -1,3 +1,5 @@
-﻿'use strict';
+﻿const { DEVICE_TYPES } = require('./constants');
 
-module.exports = {};
+module.exports = {
+  DEVICE_TYPES
+};

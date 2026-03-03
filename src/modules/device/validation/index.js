@@ -1,3 +1,3 @@
-﻿'use strict';
+﻿const deviceValidation = require('./device.validation');
 
-module.exports = {};
+module.exports = deviceValidation;

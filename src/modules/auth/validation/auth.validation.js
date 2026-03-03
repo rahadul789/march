@@ -135,11 +135,19 @@ function validateLogoutPayload(payload) {
 function extractRequestContext(req) {
   const body = req.body && typeof req.body === "object" ? req.body : {};
 
+  const parsedDeviceType =
+    typeof body.deviceType === "string"
+      ? body.deviceType.trim()
+      : typeof body.platform === "string"
+        ? body.platform.trim()
+        : null;
+
   return {
     ipAddress: req.ip || null,
     userAgent: req.headers["user-agent"] || null,
     deviceId: typeof body.deviceId === "string" ? body.deviceId.trim() : null,
     platform: typeof body.platform === "string" ? body.platform.trim() : null,
+    deviceType: parsedDeviceType,
     pushToken:
       typeof body.pushToken === "string" ? body.pushToken.trim() : null,
   };
