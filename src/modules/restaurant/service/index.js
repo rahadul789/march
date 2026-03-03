@@ -1,3 +1,3 @@
-﻿'use strict';
+﻿const restaurantService = require('./restaurant.service');
 
-module.exports = {};
+module.exports = restaurantService;

@@ -1,3 +1,3 @@
-﻿'use strict';
+﻿const restaurantController = require('./restaurant.controller');
 
-module.exports = {};
+module.exports = restaurantController;

@@ -1,3 +1,3 @@
-﻿'use strict';
+﻿const restaurantValidation = require('./restaurant.validation');
 
-module.exports = {};
+module.exports = restaurantValidation;
