@@ -1,3 +1,3 @@
-﻿'use strict';
+﻿const cartRoute = require('./cart.route');
 
-module.exports = {};
+module.exports = cartRoute;

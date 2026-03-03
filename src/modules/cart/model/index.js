@@ -1,3 +1,5 @@
-﻿'use strict';
+﻿const Cart = require('./cart.model');
 
-module.exports = {};
+module.exports = {
+  Cart
+};

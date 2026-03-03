@@ -1,3 +1,5 @@
-﻿'use strict';
+﻿const { CART_DEFAULTS } = require('./constants');
 
-module.exports = {};
+module.exports = {
+  CART_DEFAULTS
+};
