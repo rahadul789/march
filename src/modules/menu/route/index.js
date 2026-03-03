@@ -1,3 +1,3 @@
-﻿'use strict';
+﻿const menuRoute = require('./menu.route');
 
-module.exports = {};
+module.exports = menuRoute;

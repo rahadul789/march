@@ -1,3 +1,5 @@
-﻿'use strict';
+﻿const Menu = require('./menu.model');
 
-module.exports = {};
+module.exports = {
+  Menu
+};
