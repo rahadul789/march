@@ -1,3 +1,3 @@
-﻿'use strict';
+﻿const cartValidation = require('./cart.validation');
 
-module.exports = {};
+module.exports = cartValidation;
