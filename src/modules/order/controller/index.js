@@ -1,3 +1,3 @@
-﻿'use strict';
+﻿const orderController = require('./order.controller');
 
-module.exports = {};
+module.exports = orderController;
