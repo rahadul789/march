@@ -1,16 +1,67 @@
-﻿const mongoose = require('mongoose');
+const mongoose = require('mongoose');
 const AppError = require('../../../core/errors/AppError');
+const { emitEvent } = require('../../../core/events/internalEventBus');
+const { ORDER_STATUS_CHANGED_EVENT } = require('../../../core/events/eventTypes');
 const { Menu } = require('../../menu/model');
 const { Restaurant } = require('../../restaurant/model');
 const { RESTAURANT_APPROVAL_STATUSES } = require('../../restaurant/types');
-const { USER_ROLES } = require('../../auth/types');
+const { User } = require('../../auth/model');
+const { USER_ROLES, ACCOUNT_STATUSES } = require('../../auth/types');
 const { Cart } = require('../../cart/model');
 const {
   ORDER_STATUSES,
   COMMISSION_SETTLEMENT_STATUSES,
-  ORDER_DEFAULTS
+  ORDER_DEFAULTS,
+  ORDER_TRANSITION_MAP
 } = require('../types');
 const { Order, OrderSequence } = require('../model');
+
+const ORDER_TRANSITION_ROLE_MAP = Object.freeze({
+  [`${ORDER_STATUSES.PLACED}->${ORDER_STATUSES.ACCEPTED}`]: Object.freeze([
+    USER_ROLES.RESTAURANT_OWNER,
+    USER_ROLES.ADMIN
+  ]),
+  [`${ORDER_STATUSES.PLACED}->${ORDER_STATUSES.CANCELLED}`]: Object.freeze([
+    USER_ROLES.USER,
+    USER_ROLES.RESTAURANT_OWNER,
+    USER_ROLES.ADMIN
+  ]),
+  [`${ORDER_STATUSES.ACCEPTED}->${ORDER_STATUSES.PREPARING}`]: Object.freeze([
+    USER_ROLES.RESTAURANT_OWNER,
+    USER_ROLES.ADMIN
+  ]),
+  [`${ORDER_STATUSES.ACCEPTED}->${ORDER_STATUSES.CANCELLED}`]: Object.freeze([
+    USER_ROLES.RESTAURANT_OWNER,
+    USER_ROLES.ADMIN
+  ]),
+  [`${ORDER_STATUSES.PREPARING}->${ORDER_STATUSES.READY_FOR_PICKUP}`]: Object.freeze([
+    USER_ROLES.RESTAURANT_OWNER,
+    USER_ROLES.ADMIN
+  ]),
+  [`${ORDER_STATUSES.PREPARING}->${ORDER_STATUSES.CANCELLED}`]: Object.freeze([
+    USER_ROLES.RESTAURANT_OWNER,
+    USER_ROLES.ADMIN
+  ]),
+  [`${ORDER_STATUSES.READY_FOR_PICKUP}->${ORDER_STATUSES.ASSIGNED}`]: Object.freeze([
+    USER_ROLES.RESTAURANT_OWNER,
+    USER_ROLES.ADMIN
+  ]),
+  [`${ORDER_STATUSES.READY_FOR_PICKUP}->${ORDER_STATUSES.CANCELLED}`]: Object.freeze([
+    USER_ROLES.RESTAURANT_OWNER,
+    USER_ROLES.ADMIN
+  ]),
+  [`${ORDER_STATUSES.ASSIGNED}->${ORDER_STATUSES.PICKED_UP}`]: Object.freeze([
+    USER_ROLES.DELIVERYMAN,
+    USER_ROLES.ADMIN
+  ]),
+  [`${ORDER_STATUSES.ASSIGNED}->${ORDER_STATUSES.CANCELLED}`]: Object.freeze([
+    USER_ROLES.ADMIN
+  ]),
+  [`${ORDER_STATUSES.PICKED_UP}->${ORDER_STATUSES.DELIVERED}`]: Object.freeze([
+    USER_ROLES.DELIVERYMAN,
+    USER_ROLES.ADMIN
+  ])
+});
 
 function roundMoney(value) {
   return Number(Number(value).toFixed(2));
@@ -30,13 +81,36 @@ function ensureObjectId(value, fieldName) {
   return new mongoose.Types.ObjectId(value);
 }
 
+function transitionKey(fromStatus, toStatus) {
+  return `${fromStatus}->${toStatus}`;
+}
+
+function assertTransitionAllowed(fromStatus, toStatus) {
+  const allowedTargets = ORDER_TRANSITION_MAP[fromStatus] || [];
+
+  if (!allowedTargets.includes(toStatus)) {
+    throw new AppError(
+      `Invalid order transition from ${fromStatus} to ${toStatus}`,
+      400,
+      'INVALID_ORDER_TRANSITION',
+      { fromStatus, toStatus }
+    );
+  }
+}
+
+function getAllowedRolesForTransition(fromStatus, toStatus) {
+  return ORDER_TRANSITION_ROLE_MAP[transitionKey(fromStatus, toStatus)] || [];
+}
+
 function sanitizeOrder(document) {
   return {
     id: document._id.toString(),
     orderNumber: document.orderNumber,
     userId: document.userId.toString(),
     restaurantId: document.restaurantId.toString(),
+    deliverymanId: document.deliverymanId ? document.deliverymanId.toString() : null,
     status: document.status,
+    revision: document.revision,
     placedAt: document.placedAt,
     notes: document.notes,
     pricing: {
@@ -76,6 +150,7 @@ function sanitizeOrder(document) {
       lineTotal: roundMoney(item.lineTotal)
     })),
     statusHistory: document.statusHistory,
+    statusAuditLogs: document.statusAuditLogs,
     createdAt: document.createdAt,
     updatedAt: document.updatedAt
   };
@@ -205,6 +280,91 @@ async function ensureRestaurantCanOrder(restaurantId, session) {
   return restaurant;
 }
 
+async function ensureRestaurantOwnerPermission(order, actor) {
+  const restaurant = await Restaurant.findOne({
+    _id: order.restaurantId,
+    ownerId: ensureObjectId(actor.userId, 'actor.userId'),
+    isDeleted: false
+  }).select('_id');
+
+  if (!restaurant) {
+    throw new AppError('Order is not under your restaurant scope', 403, 'FORBIDDEN_OWNER_SCOPE');
+  }
+}
+
+async function ensureDeliverymanPermission(order, actor) {
+  if (!order.deliverymanId) {
+    throw new AppError('No deliveryman is assigned to this order', 409, 'DELIVERYMAN_NOT_ASSIGNED');
+  }
+
+  if (String(order.deliverymanId) !== String(actor.userId)) {
+    throw new AppError('Only assigned deliveryman can perform this transition', 403, 'FORBIDDEN_DELIVERY_SCOPE');
+  }
+}
+
+async function ensureValidDeliverymanAssignment(deliverymanId) {
+  const user = await User.findOne({
+    _id: ensureObjectId(deliverymanId, 'deliverymanId'),
+    role: USER_ROLES.DELIVERYMAN,
+    status: ACCOUNT_STATUSES.ACTIVE
+  }).select('_id');
+
+  if (!user) {
+    throw new AppError('Invalid deliveryman assignment', 400, 'INVALID_DELIVERYMAN');
+  }
+
+  return user._id;
+}
+
+async function assertTransitionPermission(order, actor, toStatus, payload) {
+  if (!actor || !actor.role || !actor.userId) {
+    throw new AppError('Authenticated actor is required', 401, 'AUTHORIZATION_REQUIRED');
+  }
+
+  const roles = getAllowedRolesForTransition(order.status, toStatus);
+
+  if (!roles.includes(actor.role)) {
+    throw new AppError('Actor role is not allowed for this transition', 403, 'FORBIDDEN_TRANSITION_ROLE', {
+      fromStatus: order.status,
+      toStatus,
+      actorRole: actor.role
+    });
+  }
+
+  if (actor.role === USER_ROLES.USER) {
+    if (String(order.userId) !== String(actor.userId)) {
+      throw new AppError('User can transition only own order', 403, 'FORBIDDEN_USER_SCOPE');
+    }
+  }
+
+  if (actor.role === USER_ROLES.RESTAURANT_OWNER) {
+    await ensureRestaurantOwnerPermission(order, actor);
+  }
+
+  if (actor.role === USER_ROLES.DELIVERYMAN) {
+    await ensureDeliverymanPermission(order, actor);
+  }
+
+  if (toStatus === ORDER_STATUSES.ASSIGNED) {
+    if (!payload.deliverymanId) {
+      throw new AppError('deliverymanId is required when assigning order', 400, 'DELIVERYMAN_REQUIRED');
+    }
+  }
+}
+
+function buildTransitionAuditLog({ fromStatus, toStatus, actor, note, requestId, revisionAfter, changedAt }) {
+  return {
+    fromStatus,
+    toStatus,
+    changedByUserId: ensureObjectId(actor.userId, 'actor.userId'),
+    changedByRole: actor.role,
+    note: note || null,
+    requestId: requestId || null,
+    revisionAfter,
+    changedAt
+  };
+}
+
 async function acquireCartLockForOrder(userId, restaurantId, lockTtlSeconds) {
   const now = new Date();
   const lockExpiresAt = new Date(now.getTime() + lockTtlSeconds * 1000);
@@ -277,7 +437,7 @@ function assertOrderActorRole(actor) {
   }
 }
 
-async function createOrderFromCart(actor, restaurantId, payload) {
+async function createOrderFromCart(actor, restaurantId, payload, context = {}) {
   assertOrderActorRole(actor);
 
   const userId = ensureObjectId(actor.userId, 'userId');
@@ -351,6 +511,7 @@ async function createOrderFromCart(actor, restaurantId, payload) {
             userId,
             restaurantId: restaurantObjectId,
             status: ORDER_STATUSES.PLACED,
+            revision: 0,
             items: itemSnapshots,
             pricing,
             commission: {
@@ -371,6 +532,17 @@ async function createOrderFromCart(actor, restaurantId, payload) {
                 note: 'Order created from locked cart snapshot',
                 changedAt: now
               }
+            ],
+            statusAuditLogs: [
+              buildTransitionAuditLog({
+                fromStatus: null,
+                toStatus: ORDER_STATUSES.PLACED,
+                actor,
+                note: 'Initial order placement',
+                requestId: context.requestId || null,
+                revisionAfter: 0,
+                changedAt: now
+              })
             ],
             notes: payload.notes || null,
             placedAt: now
@@ -417,11 +589,99 @@ async function createOrderFromCart(actor, restaurantId, payload) {
   }
 }
 
+async function transitionOrderStatus(orderId, payload, actor, context = {}) {
+  const orderObjectId = ensureObjectId(orderId, 'orderId');
+
+  const order = await Order.findById(orderObjectId);
+
+  if (!order) {
+    throw new AppError('Order not found', 404, 'ORDER_NOT_FOUND');
+  }
+
+  if (order.revision !== payload.expectedRevision) {
+    throw new AppError('Order revision conflict', 409, 'ORDER_REVISION_CONFLICT', {
+      expectedRevision: payload.expectedRevision,
+      currentRevision: order.revision
+    });
+  }
+
+  assertTransitionAllowed(order.status, payload.toStatus);
+  await assertTransitionPermission(order, actor, payload.toStatus, payload);
+
+  let deliverymanIdToSet = order.deliverymanId;
+  if (payload.toStatus === ORDER_STATUSES.ASSIGNED) {
+    deliverymanIdToSet = await ensureValidDeliverymanAssignment(payload.deliverymanId);
+  }
+
+  const now = new Date();
+  const nextRevision = order.revision + 1;
+
+  const auditLogEntry = buildTransitionAuditLog({
+    fromStatus: order.status,
+    toStatus: payload.toStatus,
+    actor,
+    note: payload.note || null,
+    requestId: context.requestId || null,
+    revisionAfter: nextRevision,
+    changedAt: now
+  });
+
+  const updatedOrder = await Order.findOneAndUpdate(
+    {
+      _id: order._id,
+      status: order.status,
+      revision: order.revision
+    },
+    {
+      $set: {
+        status: payload.toStatus,
+        revision: nextRevision,
+        deliverymanId: deliverymanIdToSet
+      },
+      $push: {
+        statusHistory: {
+          status: payload.toStatus,
+          note: payload.note || null,
+          changedAt: now
+        },
+        statusAuditLogs: auditLogEntry
+      }
+    },
+    {
+      new: true
+    }
+  );
+
+  if (!updatedOrder) {
+    throw new AppError('Order changed concurrently. Retry with latest revision.', 409, 'ORDER_REVISION_CONFLICT');
+  }
+
+  emitEvent(ORDER_STATUS_CHANGED_EVENT, {
+    orderId: updatedOrder._id.toString(),
+    orderNumber: updatedOrder.orderNumber,
+    fromStatus: order.status,
+    toStatus: updatedOrder.status,
+    revision: updatedOrder.revision,
+    changedByUserId: String(actor.userId),
+    changedByRole: actor.role,
+    restaurantId: updatedOrder.restaurantId.toString(),
+    userId: updatedOrder.userId.toString(),
+    deliverymanId: updatedOrder.deliverymanId ? updatedOrder.deliverymanId.toString() : null,
+    requestId: context.requestId || null,
+    changedAt: now.toISOString()
+  });
+
+  return sanitizeOrder(updatedOrder);
+}
+
 module.exports = {
   createOrderFromCart,
+  transitionOrderStatus,
   createDateKey,
   formatOrderNumber,
   buildOrderSnapshotFromMenus,
   calculatePricingBreakdown,
-  assertOrderActorRole
+  assertOrderActorRole,
+  assertTransitionAllowed,
+  getAllowedRolesForTransition
 };

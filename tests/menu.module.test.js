@@ -39,5 +39,5 @@ test("menu create validation normalizes numeric fields and defaults", () => {
 test("active order statuses list is defined for deletion guard", () => {
   assert.ok(Array.isArray(ACTIVE_ORDER_STATUSES));
   assert.ok(ACTIVE_ORDER_STATUSES.length > 0);
-  assert.ok(ACTIVE_ORDER_STATUSES.includes("pending"));
+  assert.ok(ACTIVE_ORDER_STATUSES.includes("PLACED"));
 });
