@@ -1,3 +1,3 @@
-﻿'use strict';
+﻿const orderService = require('./order.service');
 
-module.exports = {};
+module.exports = orderService;

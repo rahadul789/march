@@ -1,3 +1,7 @@
-﻿'use strict';
+﻿const Order = require('./order.model');
+const OrderSequence = require('./orderSequence.model');
 
-module.exports = {};
+module.exports = {
+  Order,
+  OrderSequence
+};

@@ -1,3 +1,3 @@
-﻿'use strict';
+﻿const orderValidation = require('./order.validation');
 
-module.exports = {};
+module.exports = orderValidation;

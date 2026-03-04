@@ -1,3 +1,3 @@
-﻿'use strict';
+﻿const orderRoute = require('./order.route');
 
-module.exports = {};
+module.exports = orderRoute;

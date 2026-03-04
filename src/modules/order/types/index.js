@@ -1,3 +1,11 @@
-﻿'use strict';
+﻿const {
+  ORDER_STATUSES,
+  COMMISSION_SETTLEMENT_STATUSES,
+  ORDER_DEFAULTS
+} = require('./constants');
 
-module.exports = {};
+module.exports = {
+  ORDER_STATUSES,
+  COMMISSION_SETTLEMENT_STATUSES,
+  ORDER_DEFAULTS
+};
