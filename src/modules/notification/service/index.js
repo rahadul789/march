@@ -1,3 +1,5 @@
-﻿'use strict';
+﻿const { registerOrderStatusEventHandlers } = require('./orderStatus.eventHandler');
 
-module.exports = {};
+module.exports = {
+  registerOrderStatusEventHandlers
+};

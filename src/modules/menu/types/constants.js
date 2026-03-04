@@ -5,14 +5,12 @@
 });
 
 const ACTIVE_ORDER_STATUSES = Object.freeze([
-  'pending',
-  'accepted',
-  'confirmed',
-  'preparing',
-  'ready_for_pickup',
-  'assigned',
-  'picked_up',
-  'on_the_way'
+  'PLACED',
+  'ACCEPTED',
+  'PREPARING',
+  'READY_FOR_PICKUP',
+  'ASSIGNED',
+  'PICKED_UP'
 ]);
 
 module.exports = {

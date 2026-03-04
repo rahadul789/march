@@ -1,4 +1,5 @@
 ﻿const mongoose = require('mongoose');
+const { USER_ROLES } = require('../../auth/types');
 const {
   ORDER_STATUSES,
   COMMISSION_SETTLEMENT_STATUSES,
@@ -98,6 +99,59 @@ const statusHistorySchema = new mongoose.Schema(
   { _id: false }
 );
 
+const statusAuditLogSchema = new mongoose.Schema(
+  {
+    fromStatus: {
+      type: String,
+      default: null,
+      validate: {
+        validator(value) {
+          return value === null || Object.values(ORDER_STATUSES).includes(value);
+        },
+        message: 'Invalid fromStatus'
+      }
+    },
+    toStatus: {
+      type: String,
+      required: true,
+      enum: Object.values(ORDER_STATUSES)
+    },
+    changedByUserId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      required: true
+    },
+    changedByRole: {
+      type: String,
+      required: true,
+      enum: Object.values(USER_ROLES)
+    },
+    note: {
+      type: String,
+      default: null,
+      trim: true,
+      maxlength: 500
+    },
+    requestId: {
+      type: String,
+      default: null,
+      trim: true,
+      maxlength: 64
+    },
+    revisionAfter: {
+      type: Number,
+      required: true,
+      min: 0
+    },
+    changedAt: {
+      type: Date,
+      required: true,
+      default: Date.now
+    }
+  },
+  { _id: false }
+);
+
 const orderSchema = new mongoose.Schema(
   {
     orderNumber: {
@@ -117,11 +171,22 @@ const orderSchema = new mongoose.Schema(
       ref: 'Restaurant',
       required: true
     },
+    deliverymanId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      default: null
+    },
     status: {
       type: String,
       required: true,
       enum: Object.values(ORDER_STATUSES),
       default: ORDER_STATUSES.PLACED
+    },
+    revision: {
+      type: Number,
+      required: true,
+      default: 0,
+      min: 0
     },
     items: {
       type: [orderItemSnapshotSchema],
@@ -221,6 +286,10 @@ const orderSchema = new mongoose.Schema(
       type: [statusHistorySchema],
       default: []
     },
+    statusAuditLogs: {
+      type: [statusAuditLogSchema],
+      default: []
+    },
     notes: {
       type: String,
       default: null,
@@ -241,6 +310,7 @@ const orderSchema = new mongoose.Schema(
 
 orderSchema.index({ restaurantId: 1, status: 1 }, { name: 'idx_order_restaurant_status' });
 orderSchema.index({ userId: 1 }, { name: 'idx_order_user_id' });
+orderSchema.index({ deliverymanId: 1, status: 1 }, { name: 'idx_order_deliveryman_status' });
 orderSchema.index({ placedAt: -1 }, { name: 'idx_order_placed_at' });
 orderSchema.index({ createdAt: -1 }, { name: 'idx_order_created_at' });
 

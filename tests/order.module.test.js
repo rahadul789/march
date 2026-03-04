@@ -14,7 +14,11 @@ const {
   formatOrderNumber,
   buildOrderSnapshotFromMenus,
   calculatePricingBreakdown,
+  assertTransitionAllowed,
+  getAllowedRolesForTransition,
 } = require("../src/modules/order/service/order.service");
+const { USER_ROLES } = require("../src/modules/auth/types");
+const { ORDER_STATUSES } = require("../src/modules/order/types");
 
 test("order schema has required indexes for restaurant status and userId", () => {
   const indexes = Order.schema.indexes();
@@ -78,4 +82,19 @@ test("order snapshot pricing is calculated from menu db data", () => {
   assert.equal(pricing.payableTotal, 945);
   assert.equal(pricing.grandTotal, 945);
   assert.equal(pricing.totalItems, 3);
+});
+
+test("order state machine rejects invalid transition", () => {
+  assert.throws(() => {
+    assertTransitionAllowed(ORDER_STATUSES.PLACED, ORDER_STATUSES.DELIVERED);
+  });
+});
+
+test("order state machine role map includes deliveryman for pickup transition", () => {
+  const roles = getAllowedRolesForTransition(
+    ORDER_STATUSES.ASSIGNED,
+    ORDER_STATUSES.PICKED_UP,
+  );
+
+  assert.ok(roles.includes(USER_ROLES.DELIVERYMAN));
 });

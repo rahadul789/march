@@ -13,4 +13,10 @@ router.post(
   asyncHandler(orderController.createOrder)
 );
 
+router.patch(
+  '/:orderId/status',
+  requireAuth,
+  asyncHandler(orderController.transitionOrderStatus)
+);
+
 module.exports = router;
