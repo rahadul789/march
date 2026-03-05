@@ -1,3 +1,3 @@
-﻿'use strict';
+﻿const deliveryValidation = require('./delivery.validation');
 
-module.exports = {};
+module.exports = deliveryValidation;

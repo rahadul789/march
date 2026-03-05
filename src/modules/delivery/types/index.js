@@ -1,3 +1,11 @@
-﻿'use strict';
+﻿const {
+  DELIVERY_PROFILE_DEFAULTS,
+  DELIVERY_VEHICLE_TYPES,
+  ACTIVE_DELIVERY_ORDER_STATUSES
+} = require('./constants');
 
-module.exports = {};
+module.exports = {
+  DELIVERY_PROFILE_DEFAULTS,
+  DELIVERY_VEHICLE_TYPES,
+  ACTIVE_DELIVERY_ORDER_STATUSES
+};

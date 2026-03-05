@@ -1,3 +1,5 @@
-﻿'use strict';
+﻿const DeliverymanProfile = require('./deliverymanProfile.model');
 
-module.exports = {};
+module.exports = {
+  DeliverymanProfile
+};

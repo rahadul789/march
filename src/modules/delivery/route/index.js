@@ -1,3 +1,3 @@
-﻿'use strict';
+﻿const deliveryRoute = require('./delivery.route');
 
-module.exports = {};
+module.exports = deliveryRoute;
