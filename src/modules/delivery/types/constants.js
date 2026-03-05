@@ -1,0 +1,23 @@
+﻿const DELIVERY_PROFILE_DEFAULTS = Object.freeze({
+  SEARCH_RADIUS_METERS: 5000,
+  MAX_SEARCH_RADIUS_METERS: 50000
+});
+
+const DELIVERY_VEHICLE_TYPES = Object.freeze({
+  BIKE: 'bike',
+  CYCLE: 'cycle',
+  CAR: 'car',
+  WALK: 'walk',
+  OTHER: 'other'
+});
+
+const ACTIVE_DELIVERY_ORDER_STATUSES = Object.freeze([
+  'ASSIGNED',
+  'PICKED_UP'
+]);
+
+module.exports = {
+  DELIVERY_PROFILE_DEFAULTS,
+  DELIVERY_VEHICLE_TYPES,
+  ACTIVE_DELIVERY_ORDER_STATUSES
+};

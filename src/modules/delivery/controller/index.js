@@ -1,3 +1,3 @@
-﻿'use strict';
+﻿const deliveryController = require('./delivery.controller');
 
-module.exports = {};
+module.exports = deliveryController;
