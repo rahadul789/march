@@ -1,4 +1,4 @@
-﻿const express = require('express');
+const express = require('express');
 const asyncHandler = require('../../../core/errors/asyncHandler');
 const deliveryController = require('../controller/delivery.controller');
 const { requireAuth, requireRoles } = require('../../auth/service/auth.guard');
@@ -11,6 +11,13 @@ router.get(
   requireAuth,
   requireRoles(USER_ROLES.ADMIN, USER_ROLES.RESTAURANT_OWNER),
   asyncHandler(deliveryController.findNearbyAvailable)
+);
+
+router.post(
+  '/assignment/order/:orderId/auto',
+  requireAuth,
+  requireRoles(USER_ROLES.ADMIN, USER_ROLES.RESTAURANT_OWNER),
+  asyncHandler(deliveryController.autoAssignOrder)
 );
 
 router.get(
