@@ -1,4 +1,4 @@
-﻿const deliveryService = require('../service/delivery.service');
+const deliveryService = require('../service/delivery.service');
 const deliveryValidation = require('../validation/delivery.validation');
 
 async function getMyProfile(req, res) {
@@ -71,6 +71,23 @@ async function findNearbyAvailable(req, res) {
   });
 }
 
+async function autoAssignOrder(req, res) {
+  const orderId = deliveryValidation.validateOrderIdParam(req.params);
+  const payload = deliveryValidation.validateAssignmentPayload(req.body);
+
+  const result = await deliveryService.autoAssignOrder(orderId, payload, req.auth, {
+    requestId: res.locals.requestId
+  });
+
+  return res.success({
+    statusCode: result.assignment.matched ? 200 : 202,
+    message: result.assignment.matched
+      ? 'Order assigned to deliveryman successfully'
+      : 'No deliveryman assigned yet; fallback triggered',
+    data: result
+  });
+}
+
 module.exports = {
   getMyProfile,
   updateMyProfile,
@@ -78,5 +95,6 @@ module.exports = {
   setAvailability,
   updateLocation,
   heartbeat,
-  findNearbyAvailable
+  findNearbyAvailable,
+  autoAssignOrder
 };

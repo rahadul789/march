@@ -1,5 +1,7 @@
-﻿const DeliverymanProfile = require('./deliverymanProfile.model');
+const DeliverymanProfile = require('./deliverymanProfile.model');
+const OrderAssignmentLock = require('./orderAssignmentLock.model');
 
 module.exports = {
-  DeliverymanProfile
+  DeliverymanProfile,
+  OrderAssignmentLock
 };

@@ -1,6 +1,8 @@
-﻿const AppError = require('../../../core/errors/AppError');
+const mongoose = require('mongoose');
+const AppError = require('../../../core/errors/AppError');
 const {
   DELIVERY_PROFILE_DEFAULTS,
+  DELIVERY_ASSIGNMENT_DEFAULTS,
   DELIVERY_VEHICLE_TYPES
 } = require('../types');
 
@@ -57,6 +59,21 @@ function parseNumber(value, field) {
   return parsed;
 }
 
+function parsePositiveInteger(value, field, min, max) {
+  const parsed = Number(value);
+
+  if (!Number.isInteger(parsed) || parsed < min || parsed > max) {
+    throw new AppError(
+      `${field} must be an integer between ${min} and ${max}`,
+      400,
+      'VALIDATION_ERROR',
+      { field }
+    );
+  }
+
+  return parsed;
+}
+
 function normalizeGeoPoint(lng, lat) {
   const normalizedLng = parseNumber(lng, 'lng');
   const normalizedLat = parseNumber(lat, 'lat');
@@ -73,6 +90,14 @@ function normalizeGeoPoint(lng, lat) {
     lng: normalizedLng,
     lat: normalizedLat
   };
+}
+
+function validateObjectId(value, field) {
+  if (!value || !mongoose.isValidObjectId(value)) {
+    throw new AppError(`${field} must be a valid ObjectId`, 400, 'VALIDATION_ERROR', { field });
+  }
+
+  return value;
 }
 
 function validateUpdateProfilePayload(body) {
@@ -220,11 +245,81 @@ function validateNearbyQuery(query) {
   };
 }
 
+function validateOrderIdParam(params) {
+  return validateObjectId(params && params.orderId, 'orderId');
+}
+
+function validateAssignmentPayload(body) {
+  const source = body && typeof body === 'object' ? body : {};
+
+  const payload = {
+    searchRadiusMeters: typeof source.searchRadiusMeters === 'undefined'
+      ? DELIVERY_ASSIGNMENT_DEFAULTS.SEARCH_RADIUS_METERS
+      : parsePositiveInteger(
+        source.searchRadiusMeters,
+        'searchRadiusMeters',
+        1,
+        DELIVERY_ASSIGNMENT_DEFAULTS.MAX_SEARCH_RADIUS_METERS
+      ),
+    candidateLimit: typeof source.candidateLimit === 'undefined'
+      ? DELIVERY_ASSIGNMENT_DEFAULTS.CANDIDATE_LIMIT
+      : parsePositiveInteger(
+        source.candidateLimit,
+        'candidateLimit',
+        1,
+        DELIVERY_ASSIGNMENT_DEFAULTS.MAX_CANDIDATE_LIMIT
+      ),
+    lockTtlSeconds: typeof source.lockTtlSeconds === 'undefined'
+      ? DELIVERY_ASSIGNMENT_DEFAULTS.LOCK_TTL_SECONDS
+      : parsePositiveInteger(
+        source.lockTtlSeconds,
+        'lockTtlSeconds',
+        1,
+        DELIVERY_ASSIGNMENT_DEFAULTS.MAX_LOCK_TTL_SECONDS
+      ),
+    assignmentTimeoutMs: typeof source.assignmentTimeoutMs === 'undefined'
+      ? DELIVERY_ASSIGNMENT_DEFAULTS.ASSIGNMENT_TIMEOUT_MS
+      : parsePositiveInteger(
+        source.assignmentTimeoutMs,
+        'assignmentTimeoutMs',
+        100,
+        DELIVERY_ASSIGNMENT_DEFAULTS.MAX_ASSIGNMENT_TIMEOUT_MS
+      ),
+    maxLastSeenAgeSeconds: typeof source.maxLastSeenAgeSeconds === 'undefined'
+      ? DELIVERY_ASSIGNMENT_DEFAULTS.MAX_LAST_SEEN_AGE_SECONDS
+      : parsePositiveInteger(
+        source.maxLastSeenAgeSeconds,
+        'maxLastSeenAgeSeconds',
+        5,
+        600
+      )
+  };
+
+  if ((payload.lockTtlSeconds * 1000) < payload.assignmentTimeoutMs) {
+    throw new AppError(
+      'lockTtlSeconds must cover assignmentTimeoutMs window',
+      400,
+      'VALIDATION_ERROR',
+      { field: 'lockTtlSeconds' }
+    );
+  }
+
+  payload.note = ensureString(source.note, 'note', {
+    required: false,
+    allowNull: true,
+    max: 500
+  });
+
+  return payload;
+}
+
 module.exports = {
   validateUpdateProfilePayload,
   validateOnlineTogglePayload,
   validateAvailabilityPayload,
   validateLocationPayload,
   validateHeartbeatPayload,
-  validateNearbyQuery
+  validateNearbyQuery,
+  validateOrderIdParam,
+  validateAssignmentPayload
 };
