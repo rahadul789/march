@@ -5,6 +5,7 @@ const app = require('./app');
 const logger = require('./core/logger/logger');
 const { connectWithRetry, disconnectDatabase } = require('./core/database/mongoose');
 const { initializeSocketServer, closeSocketServer } = require('./core/sockets/socketServer');
+const { initializeNotificationService } = require('./modules/notification/service');
 
 let httpServer;
 let shuttingDown = false;
@@ -56,6 +57,7 @@ async function startServer() {
 
   httpServer = http.createServer(app);
   initializeSocketServer(httpServer);
+  initializeNotificationService();
 
   httpServer.listen(env.PORT, () => {
     logger.info('HTTP server started', {
