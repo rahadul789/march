@@ -1,22 +1,21 @@
-const notificationService = require("./notification.service");
-const {
-  registerOrderStatusEventHandlers,
-} = require("./orderStatus.eventHandler");
+const notificationService = require('./notification.service');
+const { registerOrderStatusEventHandlers } = require('./orderStatus.eventHandler');
+const { dispatchExpoPushNotifications } = require('./expoPush.service');
 
-function initializeNotificationService({
-  onSocketBroadcast,
-  onPushBroadcast,
-} = {}) {
+function initializeNotificationService({ onSocketBroadcast, onPushBroadcast } = {}) {
   notificationService.configureDeliveryHandlers({
     onSocketBroadcast,
-    onPushBroadcast,
+    onPushBroadcast: typeof onPushBroadcast === 'function'
+      ? onPushBroadcast
+      : dispatchExpoPushNotifications
   });
 
-  registerOrderStatusEventHandlers(); //এটা event bus এ subscribe করে।
+  registerOrderStatusEventHandlers();
 }
 
 module.exports = {
   initializeNotificationService,
   notificationService,
   registerOrderStatusEventHandlers,
+  dispatchExpoPushNotifications
 };

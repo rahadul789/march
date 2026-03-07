@@ -1,15 +1,13 @@
-const mongoose = require("mongoose");
-const logger = require("../../../core/logger/logger");
-const AppError = require("../../../core/errors/AppError");
-const {
-  ORDER_STATUS_CHANGED_EVENT,
-} = require("../../../core/events/eventTypes");
-const { Restaurant } = require("../../restaurant/model");
-const { Notification } = require("../model");
+const mongoose = require('mongoose');
+const logger = require('../../../core/logger/logger');
+const AppError = require('../../../core/errors/AppError');
+const { ORDER_STATUS_CHANGED_EVENT } = require('../../../core/events/eventTypes');
+const { Restaurant } = require('../../restaurant/model');
+const { Notification } = require('../model');
 const {
   NOTIFICATION_TYPES,
-  NOTIFICATION_RECIPIENT_ROLES,
-} = require("../types");
+  NOTIFICATION_RECIPIENT_ROLES
+} = require('../types');
 
 let socketBroadcastHandler = null;
 let pushBroadcastHandler = null;
@@ -20,24 +18,19 @@ function ensureObjectId(value, fieldName) {
   }
 
   if (!mongoose.isValidObjectId(value)) {
-    throw new AppError(
-      `${fieldName} must be a valid ObjectId`,
-      400,
-      "VALIDATION_ERROR",
-      {
-        field: fieldName,
-      },
-    );
+    throw new AppError(`${fieldName} must be a valid ObjectId`, 400, 'VALIDATION_ERROR', {
+      field: fieldName
+    });
   }
 
   return new mongoose.Types.ObjectId(value);
 }
 
 function normalizeOrderStatus(status) {
-  return String(status || "")
+  return String(status || '')
     .trim()
     .toUpperCase()
-    .replace(/_/g, " ");
+    .replace(/_/g, ' ');
 }
 
 function buildTitle(orderNumber, toStatus) {
@@ -63,78 +56,54 @@ function buildMessage(toStatus, recipientRole) {
 }
 
 function normalizeOrderStatusEventPayload(eventPayload) {
-  if (!eventPayload || typeof eventPayload !== "object") {
-    throw new AppError(
-      "Order status event payload is required",
-      400,
-      "VALIDATION_ERROR",
-    );
+  if (!eventPayload || typeof eventPayload !== 'object') {
+    throw new AppError('Order status event payload is required', 400, 'VALIDATION_ERROR');
   }
 
-  const requiredFields = [
-    "orderId",
-    "orderNumber",
-    "restaurantId",
-    "userId",
-    "toStatus",
-  ];
+  const requiredFields = ['orderId', 'orderNumber', 'restaurantId', 'userId', 'toStatus'];
 
   for (const fieldName of requiredFields) {
     if (!eventPayload[fieldName]) {
-      throw new AppError(
-        `Missing required event field: ${fieldName}`,
-        400,
-        "VALIDATION_ERROR",
-        {
-          field: fieldName,
-        },
-      );
+      throw new AppError(`Missing required event field: ${fieldName}`, 400, 'VALIDATION_ERROR', {
+        field: fieldName
+      });
     }
   }
 
   return {
-    orderId: ensureObjectId(eventPayload.orderId, "orderId"),
+    orderId: ensureObjectId(eventPayload.orderId, 'orderId'),
     orderNumber: String(eventPayload.orderNumber).trim(),
-    restaurantId: ensureObjectId(eventPayload.restaurantId, "restaurantId"),
-    userId: ensureObjectId(eventPayload.userId, "userId"),
-    deliverymanId: eventPayload.deliverymanId
-      ? ensureObjectId(eventPayload.deliverymanId, "deliverymanId")
-      : null,
+    restaurantId: ensureObjectId(eventPayload.restaurantId, 'restaurantId'),
+    userId: ensureObjectId(eventPayload.userId, 'userId'),
+    deliverymanId: eventPayload.deliverymanId ? ensureObjectId(eventPayload.deliverymanId, 'deliverymanId') : null,
     fromStatus: eventPayload.fromStatus || null,
     toStatus: String(eventPayload.toStatus).trim().toUpperCase(),
-    revision:
-      typeof eventPayload.revision === "number" ? eventPayload.revision : null,
+    revision: typeof eventPayload.revision === 'number' ? eventPayload.revision : null,
     requestId: eventPayload.requestId ? String(eventPayload.requestId) : null,
-    changedAt: eventPayload.changedAt
-      ? new Date(eventPayload.changedAt)
-      : new Date(),
+    changedAt: eventPayload.changedAt ? new Date(eventPayload.changedAt) : new Date()
   };
 }
 
-// এই function-টার কাজ হলো order status change হলে কারা notification পাবে সেটা determine করা।
-// মানে recipients list তৈরি করা।
 async function resolveOrderStatusRecipients(normalizedEvent) {
   const recipientMap = new Map();
 
   recipientMap.set(String(normalizedEvent.userId), {
     userId: normalizedEvent.userId,
-    role: NOTIFICATION_RECIPIENT_ROLES.CUSTOMER,
+    role: NOTIFICATION_RECIPIENT_ROLES.CUSTOMER
   });
 
   if (normalizedEvent.deliverymanId) {
     recipientMap.set(String(normalizedEvent.deliverymanId), {
       userId: normalizedEvent.deliverymanId,
-      role: NOTIFICATION_RECIPIENT_ROLES.DELIVERYMAN,
+      role: NOTIFICATION_RECIPIENT_ROLES.DELIVERYMAN
     });
   }
 
-  const restaurant = await Restaurant.findById(
-    normalizedEvent.restaurantId,
-  ).select("ownerId");
+  const restaurant = await Restaurant.findById(normalizedEvent.restaurantId).select('ownerId');
   if (restaurant && restaurant.ownerId) {
     recipientMap.set(String(restaurant.ownerId), {
       userId: restaurant.ownerId,
-      role: NOTIFICATION_RECIPIENT_ROLES.RESTAURANT_OWNER,
+      role: NOTIFICATION_RECIPIENT_ROLES.RESTAURANT_OWNER
     });
   }
 
@@ -154,15 +123,15 @@ function buildNotificationDocuments(normalizedEvent, recipients) {
       fromStatus: normalizedEvent.fromStatus,
       toStatus: normalizedEvent.toStatus,
       revision: normalizedEvent.revision,
-      recipientRole: recipient.role,
+      recipientRole: recipient.role
     },
     isUnread: true,
     readAt: null,
     sourceEvent: {
       name: ORDER_STATUS_CHANGED_EVENT,
       requestId: normalizedEvent.requestId,
-      emittedAt: normalizedEvent.changedAt,
-    },
+      emittedAt: normalizedEvent.changedAt
+    }
   }));
 }
 
@@ -179,18 +148,13 @@ function sanitizeNotification(document) {
     sourceEvent: document.sourceEvent,
     delivery: document.delivery,
     createdAt: document.createdAt,
-    updatedAt: document.updatedAt,
+    updatedAt: document.updatedAt
   };
 }
 
-function configureDeliveryHandlers({
-  onSocketBroadcast,
-  onPushBroadcast,
-} = {}) {
-  socketBroadcastHandler =
-    typeof onSocketBroadcast === "function" ? onSocketBroadcast : null;
-  pushBroadcastHandler =
-    typeof onPushBroadcast === "function" ? onPushBroadcast : null;
+function configureDeliveryHandlers({ onSocketBroadcast, onPushBroadcast } = {}) {
+  socketBroadcastHandler = typeof onSocketBroadcast === 'function' ? onSocketBroadcast : null;
+  pushBroadcastHandler = typeof onPushBroadcast === 'function' ? onPushBroadcast : null;
 }
 
 async function storeNotifications(documents) {
@@ -202,31 +166,28 @@ async function storeNotifications(documents) {
   return created.map(sanitizeNotification);
 }
 
+function runBackgroundDelivery(handlerName, handler, notifications, eventPayload) {
+  Promise.resolve()
+    .then(() => handler(notifications, eventPayload))
+    .catch((error) => {
+      logger.error(`${handlerName} notification handler failed`, {
+        message: error.message,
+        stack: error.stack
+      });
+    });
+}
+
 async function dispatchPreparedNotifications(notifications, eventPayload) {
   if (!notifications.length) {
     return;
   }
 
   if (socketBroadcastHandler) {
-    try {
-      await Promise.resolve(
-        socketBroadcastHandler(notifications, eventPayload),
-      );
-    } catch (error) {
-      logger.error("Socket notification broadcast handler failed", {
-        message: error.message,
-      });
-    }
+    runBackgroundDelivery('Socket', socketBroadcastHandler, notifications, eventPayload);
   }
 
   if (pushBroadcastHandler) {
-    try {
-      await Promise.resolve(pushBroadcastHandler(notifications, eventPayload));
-    } catch (error) {
-      logger.error("Push notification broadcast handler failed", {
-        message: error.message,
-      });
-    }
+    runBackgroundDelivery('Push', pushBroadcastHandler, notifications, eventPayload);
   }
 }
 
@@ -238,11 +199,11 @@ async function handleOrderStatusChanged(eventPayload) {
 
   await dispatchPreparedNotifications(notifications, normalizedEvent);
 
-  logger.info("Order status notifications stored", {
+  logger.info('Order status notifications stored', {
     orderId: String(normalizedEvent.orderId),
     toStatus: normalizedEvent.toStatus,
     recipientCount: recipients.length,
-    persistedCount: notifications.length,
+    persistedCount: notifications.length
   });
 
   return notifications;
@@ -253,4 +214,5 @@ module.exports = {
   handleOrderStatusChanged,
   normalizeOrderStatusEventPayload,
   buildNotificationDocuments,
+  dispatchPreparedNotifications
 };

@@ -22,6 +22,28 @@ function parsePositiveInteger(value, fallback) {
   return parsed > 0 ? parsed : fallback;
 }
 
+function parseBoolean(value, fallback) {
+  if (typeof value === "undefined") {
+    return fallback;
+  }
+
+  if (typeof value === "boolean") {
+    return value;
+  }
+
+  const normalized = String(value).trim().toLowerCase();
+
+  if (["1", "true", "yes", "on"].includes(normalized)) {
+    return true;
+  }
+
+  if (["0", "false", "no", "off"].includes(normalized)) {
+    return false;
+  }
+
+  return fallback;
+}
+
 function parseCsv(value, fallback) {
   if (!value) {
     return fallback;
@@ -68,6 +90,16 @@ const config = Object.freeze({
   AUTH_LOGIN_MAX_ATTEMPTS: parsePositiveInteger(
     process.env.AUTH_LOGIN_MAX_ATTEMPTS,
     10,
+  ),
+  EXPO_PUSH_ENABLED: parseBoolean(process.env.EXPO_PUSH_ENABLED, true),
+  EXPO_PUSH_API_URL:
+    process.env.EXPO_PUSH_API_URL || "https://exp.host/--/api/v2/push/send",
+  EXPO_PUSH_ACCESS_TOKEN: process.env.EXPO_PUSH_ACCESS_TOKEN || null,
+  EXPO_PUSH_BATCH_SIZE: parsePositiveInteger(process.env.EXPO_PUSH_BATCH_SIZE, 100),
+  EXPO_PUSH_MAX_RETRIES: parseInteger(process.env.EXPO_PUSH_MAX_RETRIES, 1),
+  EXPO_PUSH_RETRY_DELAY_MS: parsePositiveInteger(
+    process.env.EXPO_PUSH_RETRY_DELAY_MS,
+    500,
   ),
 });
 
