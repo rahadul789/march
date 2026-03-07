@@ -1,3 +1,11 @@
-﻿'use strict';
+const {
+  NOTIFICATION_TYPES,
+  NOTIFICATION_CHANNEL_STATUSES,
+  NOTIFICATION_RECIPIENT_ROLES
+} = require('./constants');
 
-module.exports = {};
+module.exports = {
+  NOTIFICATION_TYPES,
+  NOTIFICATION_CHANNEL_STATUSES,
+  NOTIFICATION_RECIPIENT_ROLES
+};

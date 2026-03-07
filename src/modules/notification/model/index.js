@@ -1,3 +1,5 @@
-﻿'use strict';
+const Notification = require('./notification.model');
 
-module.exports = {};
+module.exports = {
+  Notification
+};
