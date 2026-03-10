@@ -101,6 +101,26 @@ const config = Object.freeze({
     process.env.EXPO_PUSH_RETRY_DELAY_MS,
     500,
   ),
+  SOCKET_EVENT_THROTTLE_WINDOW_MS: parsePositiveInteger(
+    process.env.SOCKET_EVENT_THROTTLE_WINDOW_MS,
+    1000,
+  ),
+  SOCKET_EVENT_THROTTLE_MAX_EVENTS: parsePositiveInteger(
+    process.env.SOCKET_EVENT_THROTTLE_MAX_EVENTS,
+    20,
+  ),
+  SOCKET_MAX_ORDER_SUBSCRIPTIONS: parsePositiveInteger(
+    process.env.SOCKET_MAX_ORDER_SUBSCRIPTIONS,
+    100,
+  ),
+  SOCKET_RECENT_SUBSCRIPTIONS_TTL_MS: parsePositiveInteger(
+    process.env.SOCKET_RECENT_SUBSCRIPTIONS_TTL_MS,
+    120000,
+  ),
+  SOCKET_CONNECTION_STATE_RECOVERY_MS: parsePositiveInteger(
+    process.env.SOCKET_CONNECTION_STATE_RECOVERY_MS,
+    120000,
+  ),
 });
 
 const requiredKeys = [
