@@ -3,6 +3,7 @@ const AppError = require("../../../core/errors/AppError");
 const { emitEvent } = require("../../../core/events/internalEventBus");
 const {
   ORDER_ASSIGNMENT_TIMEOUT_EVENT,
+  DELIVERYMAN_OFFLINE_EVENT,
 } = require("../../../core/events/eventTypes");
 const { USER_ROLES, ACCOUNT_STATUSES } = require("../../auth/types");
 const { User } = require("../../auth/model");
@@ -238,6 +239,13 @@ async function setOnlineStatus(actor, isOnline) {
   profile.lastSeenAt = new Date();
 
   await profile.save();
+
+  if (!isOnline) {
+    emitEvent(DELIVERYMAN_OFFLINE_EVENT, {
+      userId: String(profile.userId),
+      changedAt: new Date().toISOString(),
+    });
+  }
 
   return sanitizeDeliverymanProfile(profile);
 }

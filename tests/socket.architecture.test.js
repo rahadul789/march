@@ -15,7 +15,10 @@ const {
   createSocketEventThrottle,
 } = require("../src/core/sockets/socketThrottle");
 const { extractSocketAccessToken } = require("../src/core/sockets/socketAuth");
-const { normalizeOrderIds } = require("../src/core/sockets/socketEvents");
+const {
+  normalizeOrderIds,
+  validateTrackingLocationPayload,
+} = require("../src/core/sockets/socketEvents");
 
 test("socket room helpers generate deterministic room names", () => {
   assert.equal(getUserRoom("abc123"), "user:abc123");
@@ -69,4 +72,26 @@ test("extractSocketAccessToken supports handshake auth token and bearer header",
   });
 
   assert.equal(fromHeader, "token_from_header");
+});
+
+test("validateTrackingLocationPayload enforces schema and geo ranges", () => {
+  const payload = validateTrackingLocationPayload({
+    orderId: "67cd50f17f4c1020fb4ba111",
+    lng: 90.4125,
+    lat: 23.8103,
+    accuracyMeters: 12,
+  });
+
+  assert.equal(payload.orderId, "67cd50f17f4c1020fb4ba111");
+  assert.equal(payload.lng, 90.4125);
+  assert.equal(payload.lat, 23.8103);
+  assert.equal(payload.accuracyMeters, 12);
+
+  assert.throws(() => {
+    validateTrackingLocationPayload({
+      orderId: "67cd50f17f4c1020fb4ba111",
+      lng: 500,
+      lat: 23.8103,
+    });
+  });
 });
