@@ -121,6 +121,10 @@ const config = Object.freeze({
     process.env.SOCKET_CONNECTION_STATE_RECOVERY_MS,
     120000,
   ),
+  SOCKET_LOCATION_UPDATE_MIN_INTERVAL_MS: parsePositiveInteger(
+    process.env.SOCKET_LOCATION_UPDATE_MIN_INTERVAL_MS,
+    1500,
+  ),
 });
 
 const requiredKeys = [
