@@ -18,6 +18,7 @@ import {
   useRestaurantCartMutations,
   useRestaurantCartQuery
 } from '../../../src/modules/cart/query/cart.query';
+import { usePlaceOrderMutation } from '../../../src/modules/order/query/order.query';
 import { getErrorMessage } from '../../../src/core/errors/errorUtils';
 
 const MENU_LIST_PARAMS = Object.freeze({
@@ -130,6 +131,7 @@ export default function RestaurantDetailScreen() {
   const cartQuery = useRestaurantCartQuery(restaurantId);
   const { addItemMutation, updateItemMutation, removeItemMutation } =
     useRestaurantCartMutations(restaurantId);
+  const placeOrderMutation = usePlaceOrderMutation(restaurantId);
 
   const menuParams = useMemo(
     () => ({
@@ -160,6 +162,9 @@ export default function RestaurantDetailScreen() {
     addItemMutation.isPending ||
     updateItemMutation.isPending ||
     removeItemMutation.isPending;
+
+  const hasCartItems = Boolean((cart?.totals?.totalItems || 0) > 0);
+  const canPlaceOrder = hasCartItems && !hasPendingCartAction && !placeOrderMutation.isPending;
 
   const onIncreaseQuantity = async (menuId, currentQuantity) => {
     setMenuActionInFlight(menuId);
@@ -201,6 +206,24 @@ export default function RestaurantDetailScreen() {
       }
     } finally {
       setMenuActionInFlight(null);
+    }
+  };
+
+  const onPlaceOrder = async () => {
+    if (!canPlaceOrder) {
+      return;
+    }
+
+    try {
+      const placedOrder = await placeOrderMutation.mutateAsync({
+        lockTtlSeconds: 120
+      });
+
+      if (placedOrder?.id) {
+        router.push(`/(protected)/orders/${placedOrder.id}`);
+      }
+    } catch (_error) {
+      // Error state is surfaced via mutation.error in UI.
     }
   };
 
@@ -338,6 +361,27 @@ export default function RestaurantDetailScreen() {
 
             {cartQuery.error ? (
               <Text style={styles.inlineError}>{getErrorMessage(cartQuery.error)}</Text>
+            ) : null}
+
+            <Pressable
+              style={[
+                styles.placeOrderButton,
+                !canPlaceOrder ? styles.placeOrderButtonDisabled : null
+              ]}
+              onPress={onPlaceOrder}
+              disabled={!canPlaceOrder}
+            >
+              {placeOrderMutation.isPending ? (
+                <ActivityIndicator color="#fff" size="small" />
+              ) : (
+                <Text style={styles.placeOrderButtonText}>Place Order</Text>
+              )}
+            </Pressable>
+
+            {placeOrderMutation.error ? (
+              <Text style={styles.inlineError}>
+                {getErrorMessage(placeOrderMutation.error)}
+              </Text>
             ) : null}
 
             {menuQuery.isLoading ? (
@@ -568,6 +612,21 @@ const styles = StyleSheet.create({
   },
   cartSummaryValueStrong: {
     color: '#0f172a',
+    fontWeight: '700'
+  },
+  placeOrderButton: {
+    marginBottom: 10,
+    borderRadius: 10,
+    backgroundColor: '#0f172a',
+    paddingVertical: 12,
+    alignItems: 'center'
+  },
+  placeOrderButtonDisabled: {
+    opacity: 0.6
+  },
+  placeOrderButtonText: {
+    color: '#fff',
+    fontSize: 14,
     fontWeight: '700'
   },
   inlineError: {

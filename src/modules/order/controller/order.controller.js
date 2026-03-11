@@ -30,7 +30,18 @@ async function transitionOrderStatus(req, res) {
   });
 }
 
+async function getOrderById(req, res) {
+  const orderId = orderValidation.validateOrderIdParam(req.params);
+  const order = await orderService.getOrderById(orderId, req.auth);
+
+  return res.success({
+    message: 'Order fetched successfully',
+    data: { order }
+  });
+}
+
 module.exports = {
   createOrder,
-  transitionOrderStatus
+  transitionOrderStatus,
+  getOrderById
 };

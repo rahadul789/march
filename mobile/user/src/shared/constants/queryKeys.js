@@ -18,6 +18,9 @@ export const QUERY_KEYS = Object.freeze({
   auth: Object.freeze({
     me: ['auth', 'me']
   }),
+  order: Object.freeze({
+    detail: (orderId) => ['order', 'detail', String(orderId || '')]
+  }),
   cart: Object.freeze({
     byRestaurant: (restaurantId) => [
       'cart',

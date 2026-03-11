@@ -6,6 +6,12 @@ const { USER_ROLES } = require('../../auth/types');
 
 const router = express.Router();
 
+router.get(
+  '/:orderId',
+  requireAuth,
+  asyncHandler(orderController.getOrderById)
+);
+
 router.post(
   '/restaurant/:restaurantId',
   requireAuth,
