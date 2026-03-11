@@ -66,6 +66,16 @@ export default function HomeScreen() {
 
       <Pressable
         style={({ pressed }) => [
+          styles.secondaryButton,
+          pressed ? styles.buttonPressed : null
+        ]}
+        onPress={() => router.push('/(protected)/restaurants')}
+      >
+        <Text style={styles.secondaryButtonText}>Browse Restaurants</Text>
+      </Pressable>
+
+      <Pressable
+        style={({ pressed }) => [
           styles.button,
           pressed ? styles.buttonPressed : null,
           logoutMutation.isPending ? styles.buttonDisabled : null
@@ -136,6 +146,20 @@ const styles = StyleSheet.create({
   },
   buttonText: {
     color: '#fff',
+    fontSize: 15,
+    fontWeight: '600'
+  },
+  secondaryButton: {
+    marginTop: 18,
+    borderWidth: 1,
+    borderColor: '#0f172a',
+    borderRadius: 10,
+    alignItems: 'center',
+    paddingVertical: 12,
+    backgroundColor: '#fff'
+  },
+  secondaryButtonText: {
+    color: '#0f172a',
     fontSize: 15,
     fontWeight: '600'
   },
