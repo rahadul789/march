@@ -14,6 +14,10 @@ import {
   useRestaurantDetailQuery,
   useRestaurantMenuQuery
 } from '../../../src/modules/restaurant/query/restaurant.query';
+import {
+  useRestaurantCartMutations,
+  useRestaurantCartQuery
+} from '../../../src/modules/cart/query/cart.query';
 import { getErrorMessage } from '../../../src/core/errors/errorUtils';
 
 const MENU_LIST_PARAMS = Object.freeze({
@@ -43,27 +47,73 @@ function CategoryChip({ isSelected, label, onPress }) {
   );
 }
 
-function MenuRow({ item }) {
+function MenuRow({
+  item,
+  cartItem,
+  onIncrease,
+  onDecrease,
+  isUpdating,
+  disableActions
+}) {
   const hasDiscount = Number(item.discount || 0) > 0;
+  const hasInCart = Boolean(cartItem);
+  const displayedPrice = hasInCart
+    ? formatPrice(cartItem.lineTotal)
+    : formatPrice(item.discountedPrice);
 
   return (
     <View style={styles.menuCard}>
       <View style={styles.menuCardHeader}>
         <Text style={styles.menuName}>{item.name}</Text>
-        <Text style={styles.menuPrice}>{formatPrice(item.discountedPrice)}</Text>
+        <Text style={styles.menuPrice}>{displayedPrice}</Text>
       </View>
       <Text style={styles.menuDescription} numberOfLines={2}>
         {item.description}
       </Text>
       <View style={styles.menuMetaRow}>
         <Text style={styles.menuMeta}>{item.preparationTime} min</Text>
-        {hasDiscount ? (
+        {hasDiscount && !hasInCart ? (
           <Text style={styles.menuDiscount}>-{Number(item.discount).toFixed(0)}%</Text>
         ) : null}
       </View>
-      <Pressable style={styles.addButton} disabled>
-        <Text style={styles.addButtonText}>Add (Cart next milestone)</Text>
-      </Pressable>
+
+      {hasInCart ? (
+        <View style={styles.quantityRow}>
+          <Pressable
+            style={[
+              styles.quantityButton,
+              disableActions ? styles.quantityButtonDisabled : null
+            ]}
+            onPress={() => onDecrease(item.id, cartItem.quantity)}
+            disabled={disableActions}
+          >
+            <Text style={styles.quantityButtonText}>-</Text>
+          </Pressable>
+          <Text style={styles.quantityValue}>{cartItem.quantity}</Text>
+          <Pressable
+            style={[
+              styles.quantityButton,
+              disableActions ? styles.quantityButtonDisabled : null
+            ]}
+            onPress={() => onIncrease(item.id, cartItem.quantity)}
+            disabled={disableActions}
+          >
+            <Text style={styles.quantityButtonText}>+</Text>
+          </Pressable>
+        </View>
+      ) : (
+        <Pressable
+          style={[styles.addButton, disableActions ? styles.addButtonDisabled : null]}
+          onPress={() => onIncrease(item.id, 0)}
+          disabled={disableActions}
+        >
+          {isUpdating ? (
+            <ActivityIndicator color="#fff" size="small" />
+          ) : (
+            <Text style={styles.addButtonText}>Add to cart</Text>
+          )}
+        </Pressable>
+      )}
     </View>
   );
 }
@@ -73,9 +123,13 @@ export default function RestaurantDetailScreen() {
   const params = useLocalSearchParams();
   const restaurantId = String(params.restaurantId || '').trim();
   const [selectedCategoryId, setSelectedCategoryId] = useState(null);
+  const [menuActionInFlight, setMenuActionInFlight] = useState(null);
 
   const restaurantQuery = useRestaurantDetailQuery(restaurantId);
   const categoriesQuery = useRestaurantCategoriesQuery(restaurantId);
+  const cartQuery = useRestaurantCartQuery(restaurantId);
+  const { addItemMutation, updateItemMutation, removeItemMutation } =
+    useRestaurantCartMutations(restaurantId);
 
   const menuParams = useMemo(
     () => ({
@@ -89,6 +143,66 @@ export default function RestaurantDetailScreen() {
 
   const categoryItems = categoriesQuery.data || [];
   const menuItems = menuQuery.data?.items || [];
+  const cart = cartQuery.data || null;
+
+  const cartItemsByMenuId = useMemo(() => {
+    const map = new Map();
+    const items = Array.isArray(cart?.items) ? cart.items : [];
+
+    for (const item of items) {
+      map.set(String(item.menuId), item);
+    }
+
+    return map;
+  }, [cart]);
+
+  const hasPendingCartAction =
+    addItemMutation.isPending ||
+    updateItemMutation.isPending ||
+    removeItemMutation.isPending;
+
+  const onIncreaseQuantity = async (menuId, currentQuantity) => {
+    setMenuActionInFlight(menuId);
+
+    try {
+      if (!currentQuantity) {
+        await addItemMutation.mutateAsync({
+          menuId,
+          quantity: 1
+        });
+      } else {
+        await updateItemMutation.mutateAsync({
+          menuId,
+          quantity: Number(currentQuantity) + 1
+        });
+      }
+    } finally {
+      setMenuActionInFlight(null);
+    }
+  };
+
+  const onDecreaseQuantity = async (menuId, currentQuantity) => {
+    if (!currentQuantity || currentQuantity < 1) {
+      return;
+    }
+
+    setMenuActionInFlight(menuId);
+
+    try {
+      if (Number(currentQuantity) === 1) {
+        await removeItemMutation.mutateAsync({
+          menuId
+        });
+      } else {
+        await updateItemMutation.mutateAsync({
+          menuId,
+          quantity: Number(currentQuantity) - 1
+        });
+      }
+    } finally {
+      setMenuActionInFlight(null);
+    }
+  };
 
   if (restaurantQuery.isLoading) {
     return (
@@ -122,7 +236,21 @@ export default function RestaurantDetailScreen() {
       <FlatList
         data={menuItems}
         keyExtractor={(item) => item.id}
-        renderItem={({ item }) => <MenuRow item={item} />}
+        renderItem={({ item }) => {
+          const cartItem = cartItemsByMenuId.get(String(item.id)) || null;
+          const isUpdating = hasPendingCartAction && menuActionInFlight === item.id;
+
+          return (
+            <MenuRow
+              item={item}
+              cartItem={cartItem}
+              onIncrease={onIncreaseQuantity}
+              onDecrease={onDecreaseQuantity}
+              isUpdating={isUpdating}
+              disableActions={hasPendingCartAction}
+            />
+          );
+        }}
         ListHeaderComponent={
           <View>
             <Pressable style={styles.inlineBack} onPress={() => router.back()}>
@@ -171,6 +299,46 @@ export default function RestaurantDetailScreen() {
             ) : null}
 
             <Text style={styles.sectionTitle}>Menu</Text>
+
+            {cartQuery.isLoading ? (
+              <View style={styles.cartSyncRow}>
+                <ActivityIndicator color="#0f172a" size="small" />
+                <Text style={styles.cartSyncText}>Syncing cart...</Text>
+              </View>
+            ) : null}
+
+            {cart ? (
+              <View style={styles.cartSummaryCard}>
+                <View style={styles.cartSummaryRow}>
+                  <Text style={styles.cartSummaryLabel}>Items</Text>
+                  <Text style={styles.cartSummaryValue}>
+                    {cart.totals?.totalItems || 0}
+                  </Text>
+                </View>
+                <View style={styles.cartSummaryRow}>
+                  <Text style={styles.cartSummaryLabel}>Subtotal</Text>
+                  <Text style={styles.cartSummaryValue}>
+                    {formatPrice(cart.totals?.subtotal)}
+                  </Text>
+                </View>
+                <View style={styles.cartSummaryRow}>
+                  <Text style={styles.cartSummaryLabel}>Discount</Text>
+                  <Text style={styles.cartSummaryValue}>
+                    {formatPrice(cart.totals?.discountTotal)}
+                  </Text>
+                </View>
+                <View style={styles.cartSummaryRow}>
+                  <Text style={styles.cartSummaryLabelStrong}>Payable</Text>
+                  <Text style={styles.cartSummaryValueStrong}>
+                    {formatPrice(cart.totals?.payableTotal)}
+                  </Text>
+                </View>
+              </View>
+            ) : null}
+
+            {cartQuery.error ? (
+              <Text style={styles.inlineError}>{getErrorMessage(cartQuery.error)}</Text>
+            ) : null}
 
             {menuQuery.isLoading ? (
               <View style={styles.smallLoader}>
@@ -319,18 +487,88 @@ const styles = StyleSheet.create({
   },
   addButton: {
     marginTop: 10,
-    borderRadius: 8,
-    backgroundColor: '#e2e8f0',
-    paddingVertical: 9,
+    borderRadius: 9,
+    backgroundColor: '#0f172a',
+    paddingVertical: 10,
     alignItems: 'center'
   },
+  addButtonDisabled: {
+    opacity: 0.7
+  },
   addButtonText: {
-    color: '#475569',
+    color: '#fff',
     fontWeight: '600',
-    fontSize: 12
+    fontSize: 13
+  },
+  quantityRow: {
+    marginTop: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
+  quantityButton: {
+    width: 34,
+    height: 34,
+    borderRadius: 8,
+    backgroundColor: '#0f172a',
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
+  quantityButtonDisabled: {
+    opacity: 0.7
+  },
+  quantityButtonText: {
+    color: '#fff',
+    fontSize: 20,
+    lineHeight: 20,
+    fontWeight: '700'
+  },
+  quantityValue: {
+    minWidth: 40,
+    textAlign: 'center',
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#0f172a'
   },
   smallLoader: {
     paddingVertical: 8
+  },
+  cartSyncRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 10
+  },
+  cartSyncText: {
+    marginLeft: 8,
+    color: '#334155'
+  },
+  cartSummaryCard: {
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 10
+  },
+  cartSummaryRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 6
+  },
+  cartSummaryLabel: {
+    color: '#475569'
+  },
+  cartSummaryValue: {
+    color: '#0f172a',
+    fontWeight: '600'
+  },
+  cartSummaryLabelStrong: {
+    color: '#0f172a',
+    fontWeight: '700'
+  },
+  cartSummaryValueStrong: {
+    color: '#0f172a',
+    fontWeight: '700'
   },
   inlineError: {
     color: '#dc2626'
