@@ -674,9 +674,51 @@ async function transitionOrderStatus(orderId, payload, actor, context = {}) {
   return sanitizeOrder(updatedOrder);
 }
 
+async function getOrderById(orderId, actor) {
+  const orderObjectId = ensureObjectId(orderId, 'orderId');
+
+  if (!actor || !actor.role || !actor.userId) {
+    throw new AppError('Authenticated actor is required', 401, 'AUTHORIZATION_REQUIRED');
+  }
+
+  const order = await Order.findById(orderObjectId);
+
+  if (!order) {
+    throw new AppError('Order not found', 404, 'ORDER_NOT_FOUND');
+  }
+
+  if (actor.role === USER_ROLES.ADMIN) {
+    return sanitizeOrder(order);
+  }
+
+  if (actor.role === USER_ROLES.USER) {
+    if (String(order.userId) !== String(actor.userId)) {
+      throw new AppError('User can access only own order', 403, 'FORBIDDEN_USER_SCOPE');
+    }
+
+    return sanitizeOrder(order);
+  }
+
+  if (actor.role === USER_ROLES.DELIVERYMAN) {
+    if (!order.deliverymanId || String(order.deliverymanId) !== String(actor.userId)) {
+      throw new AppError('Deliveryman can access only assigned order', 403, 'FORBIDDEN_DELIVERY_SCOPE');
+    }
+
+    return sanitizeOrder(order);
+  }
+
+  if (actor.role === USER_ROLES.RESTAURANT_OWNER) {
+    await ensureRestaurantOwnerPermission(order, actor);
+    return sanitizeOrder(order);
+  }
+
+  throw new AppError('Actor role is not allowed for this operation', 403, 'FORBIDDEN_ROLE');
+}
+
 module.exports = {
   createOrderFromCart,
   transitionOrderStatus,
+  getOrderById,
   createDateKey,
   formatOrderNumber,
   buildOrderSnapshotFromMenus,
