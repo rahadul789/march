@@ -476,6 +476,7 @@ async function handleTrackingLocationUpdate(io, socket, payload, ack) {
   };
 
   io.to(room).emit('tracking:location_update', trackingPayload);
+  io.to(room).emit('order:delivery:location', trackingPayload);
   safeAck(ack, { ok: true, data: trackingPayload });
 }
 
