@@ -22,6 +22,8 @@ import {
   TERMINAL_ORDER_STATUSES,
   TRACKABLE_ORDER_STATUSES
 } from '../../../src/modules/order/types/order.constants';
+import useLiveDeliveryTracking from '../../../src/modules/order/hooks/useLiveDeliveryTracking';
+import LiveTrackingMapCard from '../../../src/modules/order/ui/LiveTrackingMapCard';
 
 function formatPrice(value) {
   return `${Number(value || 0).toFixed(2)} BDT`;
@@ -64,6 +66,10 @@ export default function OrderDetailsScreen() {
 
   const isTrackableStatus = TRACKABLE_ORDER_STATUSES.has(order?.status);
   const isTerminalStatus = TERMINAL_ORDER_STATUSES.has(order?.status);
+  const liveTracking = useLiveDeliveryTracking({
+    orderId,
+    orderStatus: order?.status
+  });
 
   const orderItems = useMemo(() => (Array.isArray(order?.items) ? order.items : []), [order]);
 
@@ -200,6 +206,19 @@ export default function OrderDetailsScreen() {
                     : 'Tracking will start when order becomes ASSIGNED.'}
               </Text>
             </View>
+
+            <LiveTrackingMapCard
+              trackingEnabled={liveTracking.trackingEnabled}
+              trackingStopped={liveTracking.trackingStopped}
+              riderOffline={liveTracking.riderOffline}
+              userCoordinate={liveTracking.userCoordinate}
+              deliveryCoordinate={liveTracking.deliveryCoordinate}
+              deliveryUpdatedAt={liveTracking.deliveryUpdatedAt}
+              deliverySignalStale={liveTracking.deliverySignalStale}
+              locationPermissionGranted={liveTracking.locationPermissionGranted}
+              locationLoading={liveTracking.locationLoading}
+              animatedDeliveryCoordinate={liveTracking.animatedDeliveryCoordinate}
+            />
 
             <Text style={styles.sectionTitle}>Items</Text>
           </View>
