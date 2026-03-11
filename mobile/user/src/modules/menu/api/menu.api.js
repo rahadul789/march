@@ -2,24 +2,17 @@ import { privateApiClient } from '../../../core/api/httpClient';
 import { unwrapApiData } from '../../../core/api/apiResponse';
 import { normalizeApiError } from '../../../core/errors/errorUtils';
 
-export async function listRestaurants(params = {}) {
+export async function listRestaurantMenu(restaurantId, params = {}) {
   try {
-    const response = await privateApiClient.get('/restaurant', { params });
+    const response = await privateApiClient.get(`/menu/restaurant/${restaurantId}`, {
+      params
+    });
+
     const items = unwrapApiData(response);
     return {
       items: Array.isArray(items) ? items : [],
       meta: response.data?.meta || null
     };
-  } catch (error) {
-    throw normalizeApiError(error);
-  }
-}
-
-export async function getRestaurantById(restaurantId) {
-  try {
-    const response = await privateApiClient.get(`/restaurant/${restaurantId}`);
-    const result = unwrapApiData(response);
-    return result?.restaurant || null;
   } catch (error) {
     throw normalizeApiError(error);
   }
